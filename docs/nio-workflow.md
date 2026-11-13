@@ -16,9 +16,22 @@ paths supplied with environment variables:
 
 - `fujinet-nio`
 - `fujinet-nio-driver`
-- `nio-apps` if you want to build the sample MS-DOS command applications
+- `nio-core-apps`, `nio-apps` and `nio-config` if you want the MS-DOS command
+  applications (`FHOST`, `FMOUNT`, `CONFNIO` and so on)
 
-You will need Open Watcom in your shell
+You will need Open Watcom in your shell.
+
+## Base MS-DOS Image
+
+This repository does not ship an MS-DOS disk image. Build a bootable MS-DOS 6.22
+disk with `qemu-msdos-init` from your own MS-DOS install disks (see its
+README), then point `BASE_IMAGE` at the raw or qcow2 file it writes:
+
+```sh
+export BASE_IMAGE=/path/to/qemu-msdos-init/build/msdos622-cf-2047m-auto.img
+```
+
+`build-nio-qcow` stops with an error if `BASE_IMAGE` is not set.
 
 ## Build Inputs
 
@@ -36,11 +49,12 @@ cd /path/to/fujinet-nio-driver
 make
 ```
 
-Build the MS-DOS NIO applications:
+Build the MS-DOS NIO applications, in each repository that provides them:
 
 ```sh
-cd /path/to/nio-apps
-make -C msdos clean all
+make -C /path/to/nio-core-apps TARGET=msdos
+make -C /path/to/nio-apps TARGET=msdos
+make -C /path/to/nio-config TARGET=msdos   # needs PDCURSES_DIR, see its README
 ```
 
 ## App Manifest
@@ -57,18 +71,18 @@ Manifest entries map host files to MS-DOS 8.3 filenames:
 
 ```yaml
 apps:
-  - src: ${NIO_APPS_MSDOS_BIN}/fhost.exe
+  - src: ${NIO_CORE_APPS_MSDOS_BIN}/fhost.exe
     name: FHOST.EXE
-  - src: ${NIO_APPS_MSDOS_BIN}/fmount.exe
+  - src: ${NIO_CORE_APPS_MSDOS_BIN}/fmount.exe
     name: FMOUNT.EXE
-  - src: ${NIO_APPS_MSDOS_BIN}/config-nio.exe
+  - src: ${NIO_CONFIG_MSDOS_BIN}/config-nio.exe
     name: CONFNIO.EXE
 ```
 
 Fields:
 
 - `src`: host path to copy. Supports environment variables such as
-  `${NIO_APPS_MSDOS}` and `~`.
+  `${NIO_CORE_APPS_MSDOS_BIN}` and `~`.
 - `name`: destination filename under `C:\FNAPPS`. Use an MS-DOS 8.3 name.
 - `required`: optional. Defaults to `true`; set `false` to skip missing files.
 
@@ -76,7 +90,9 @@ Typical environment:
 
 ```sh
 export FUJINET_NIO_DRIVER=/path/to/fujinet-nio-driver
+export NIO_CORE_APPS_MSDOS_BIN=/path/to/nio-core-apps/build/msdos/bin
 export NIO_APPS_MSDOS_BIN=/path/to/nio-apps/build/msdos/bin
+export NIO_CONFIG_MSDOS_BIN=/path/to/nio-config/build/msdos/bin
 export FUJINET_NIO_LIB=/path/to/fujinet-nio-lib
 ```
 
@@ -106,8 +122,7 @@ This writes:
 build/msdos-nio-apps.qcow2
 ```
 
-`build-nio-qcow` clones the base `msdos.qcow2`, removes the legacy `C:\FN`
-directory from the generated image, injects `FUJINET.SYS`, updates
+`build-nio-qcow` converts your base image, injects `FUJINET.SYS`, updates
 `AUTOEXEC.BAT` so `C:\FNAPPS` is on `PATH`, then optionally copies manifest
 applications into `C:\FNAPPS`. Generated images under `build/` are not
 committed.

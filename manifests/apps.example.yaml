@@ -1,25 +1,35 @@
 # Copy to manifests/apps.yaml and adjust paths for your workspace layout.
 #
 # Paths support shell-style environment expansion (${VAR}) and ~.
+#
+# The apps come from three repositories, each with its own build directory:
+#   NIO_CORE_APPS_MSDOS_BIN  nio-core-apps/build/msdos/bin
+#   NIO_APPS_MSDOS_BIN       nio-apps/build/msdos/bin
+#   NIO_CONFIG_MSDOS_BIN     nio-config/build/msdos/bin
 # Relative paths are resolved from the fujinet-qemu-msdos repository root.
 #
 # Each entry copies a host file into C:\FNAPPS using the given FAT 8.3 name.
 # Optional apps (required: false) are skipped when the source file is missing.
 
 apps:
-  - src: ${NIO_APPS_MSDOS_BIN}/fdrive.exe
+  - src: ${NIO_CORE_APPS_MSDOS_BIN}/fdrive.exe
     name: FDRIVE.EXE
-  - src: ${NIO_APPS_MSDOS_BIN}/fhost.exe
+  - src: ${NIO_CORE_APPS_MSDOS_BIN}/fhost.exe
     name: FHOST.EXE
-  - src: ${NIO_APPS_MSDOS_BIN}/fin.exe
+  - src: ${NIO_CORE_APPS_MSDOS_BIN}/fin.exe
     name: FIN.EXE
-  - src: ${NIO_APPS_MSDOS_BIN}/fout.exe
+  - src: ${NIO_CORE_APPS_MSDOS_BIN}/fout.exe
     name: FOUT.EXE
-  - src: ${NIO_APPS_MSDOS_BIN}/fls.exe
+  - src: ${NIO_CORE_APPS_MSDOS_BIN}/fls.exe
     name: FLS.EXE
-  - src: ${NIO_APPS_MSDOS_BIN}/fmount.exe
+  - src: ${NIO_CORE_APPS_MSDOS_BIN}/fmount.exe
     name: FMOUNT.EXE
-  - src: ${NIO_APPS_MSDOS_BIN}/fapp.exe
+  - src: ${NIO_CORE_APPS_MSDOS_BIN}/fboot.exe
+    name: FBOOT.EXE
+  - src: ${NIO_CORE_APPS_MSDOS_BIN}/fapp.exe
     name: FAPP.EXE
-  - src: ${NIO_APPS_MSDOS_BIN}/config-nio.exe
+  - src: ${NIO_APPS_MSDOS_BIN}/fhttpbin.exe
+    name: FHTTPBIN.EXE
+    required: false
+  - src: ${NIO_CONFIG_MSDOS_BIN}/config-nio.exe
     name: CONFNIO.EXE

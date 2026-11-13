@@ -28,8 +28,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "-b",
         "--base",
-        default=os.environ.get("BASE_IMAGE", str(root / "msdos.qcow2")),
-        help="Base MS-DOS qcow/qcow2 image (env: BASE_IMAGE)",
+        default=os.environ.get("BASE_IMAGE", ""),
+        help=(
+            "Base MS-DOS image, raw or qcow2, e.g. one built by qemu-msdos-init "
+            "(env: BASE_IMAGE, required)"
+        ),
     )
     parser.add_argument(
         "-o",
@@ -58,15 +61,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--apps-dir",
         default=os.environ.get("APPS_DIR", "FNAPPS"),
         help="DOS directory for injected apps (env: APPS_DIR, default: FNAPPS)",
-    )
-    parser.add_argument(
-        "--legacy-app-dir",
-        action="append",
-        default=None,
-        help=(
-            "Legacy DOS app directory to remove from generated image. "
-            "May be repeated (env: LEGACY_APP_DIRS, default: FN)."
-        ),
     )
     parser.add_argument(
         "--repo-root",
@@ -106,7 +100,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     args = parser.parse_args(argv)
     args.repo_root = Path(args.repo_root).resolve()
-    args.base_image = resolve_path(args.base, args.repo_root)
+    args.base_image = resolve_path(args.base, args.repo_root) if args.base.strip() else None
     args.driver_repo = (
         resolve_path(args.driver_repo, args.repo_root) if args.driver_repo else None
     )
@@ -130,17 +124,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     else:
         args.output_image = build_dir / "msdos-nio.qcow2"
 
-    if args.legacy_app_dir is None:
-        legacy = os.environ.get("LEGACY_APP_DIRS", "FN")
-        args.legacy_app_dirs = [item for item in legacy.split(":") if item.strip()]
-    else:
-        args.legacy_app_dirs = args.legacy_app_dir
-
     return args
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+
+    if args.base_image is None:
+        print(
+            "BASE_IMAGE is not defined.\n"
+            "Set BASE_IMAGE (or pass --base) to a bootable MS-DOS disk image. "
+            "This repository does not ship one: build it with qemu-msdos-init "
+            "from your own MS-DOS install disks.",
+            file=sys.stderr,
+        )
+        return 1
 
     if args.driver_repo is None:
         print(
@@ -178,7 +176,6 @@ def main(argv: list[str] | None = None) -> int:
                 debug_io=args.fuji_debug_io.strip(),
             ),
             apps_dir=args.apps_dir,
-            legacy_app_dirs=args.legacy_app_dirs,
         )
     except (FileNotFoundError, RuntimeError, ValueError) as exc:
         print(exc, file=sys.stderr)

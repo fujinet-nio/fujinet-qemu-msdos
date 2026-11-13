@@ -15,7 +15,7 @@ import yaml
 
 FAT83_RE = re.compile(r"^[A-Z0-9]{1,8}\.[A-Z0-9]{1,3}$")
 FAT_DIR_RE = re.compile(r"^[A-Z0-9]{1,8}$")
-REQUIRED_TOOLS = ("qemu-img", "fdisk", "mcopy", "mdir", "mmd", "mdeltree")
+REQUIRED_TOOLS = ("qemu-img", "fdisk", "mcopy", "mdir", "mmd")
 
 
 @dataclass(frozen=True)
@@ -132,17 +132,6 @@ def mcopy(raw_image: Path, offset: int, src: Path, dest_name: str) -> None:
 def mmd(raw_image: Path, offset: int, name: str) -> None:
     image_spec = f"{raw_image}@@{offset}"
     subprocess.run(["mmd", "-i", image_spec, f"::{name}"], check=False)
-
-
-def mdeltree(raw_image: Path, offset: int, name: str) -> None:
-    image_spec = f"{raw_image}@@{offset}"
-    subprocess.run(
-        ["mdeltree", "-i", image_spec, f"::{name}"],
-        check=False,
-        text=True,
-        input="y\n",
-        capture_output=True,
-    )
 
 
 def mdir(raw_image: Path, offset: int, names: list[str]) -> None:
@@ -266,16 +255,12 @@ def path_line_parts(line: str) -> tuple[str, str] | None:
 def append_path_entry(
     existing_value: str,
     entry: str,
-    remove_entries: list[str],
 ) -> str:
     wanted = normalise_dos_path(entry)
-    removals = {normalise_dos_path(item) for item in remove_entries}
     entries: list[str] = []
 
     for item in split_path_entries(existing_value):
         normalised = normalise_dos_path(item)
-        if normalised in removals:
-            continue
         if normalised == wanted:
             continue
         entries.append(item)
@@ -288,13 +273,11 @@ def inject_autoexec_path(
     raw_image: Path,
     offset: int,
     apps_dir: str,
-    legacy_dirs: list[str],
 ) -> None:
     existing = read_dos_file(raw_image, offset, "AUTOEXEC.BAT")
     lines: list[str] = []
     path_seen = False
     apps_path = f"C:\\{apps_dir}"
-    legacy_paths = [f"C:\\{name}" for name in legacy_dirs]
 
     for raw_line in existing.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
         line = raw_line.rstrip()
@@ -307,7 +290,7 @@ def inject_autoexec_path(
             continue
 
         prefix, value = parts
-        value = append_path_entry(value, apps_path, legacy_paths)
+        value = append_path_entry(value, apps_path)
         lines.append(f"{prefix}{value}")
         path_seen = True
 
@@ -317,20 +300,6 @@ def inject_autoexec_path(
     contents = "\r\n".join(lines) + "\r\n"
     print(f"Injecting AUTOEXEC.BAT PATH entry: {apps_path}", flush=True)
     write_dos_file(raw_image, offset, "AUTOEXEC.BAT", contents)
-
-
-def remove_legacy_dirs(
-    raw_image: Path,
-    offset: int,
-    apps_dir: str,
-    legacy_dirs: list[str],
-) -> None:
-    for name in legacy_dirs:
-        fat_name = validate_fat_dir(name)
-        if fat_name == apps_dir:
-            continue
-        print(f"Removing legacy app directory C:\\{fat_name} if present...", flush=True)
-        mdeltree(raw_image, offset, fat_name)
 
 
 def inject_apps(
@@ -382,7 +351,6 @@ def build_qcow2(
     apps_manifest: Path | None,
     driver_config: DriverConfig,
     apps_dir: str = "FNAPPS",
-    legacy_app_dirs: list[str] | None = None,
 ) -> None:
     require_tools()
 
@@ -396,8 +364,6 @@ def build_qcow2(
 
     apps: list[AppEntry] = []
     apps_dir = validate_fat_dir(apps_dir)
-    legacy_app_dirs = legacy_app_dirs or ["FN"]
-    legacy_app_dirs = [validate_fat_dir(name) for name in legacy_app_dirs]
 
     if apps_manifest is not None:
         if not apps_manifest.is_file():
@@ -418,12 +384,11 @@ def build_qcow2(
         run_checked(["qemu-img", "convert", "-O", "raw", str(base_image), str(raw_image)])
 
         offset = partition_start_sector(raw_image) * 512
-        remove_legacy_dirs(raw_image, offset, apps_dir, legacy_app_dirs)
         inject_driver(raw_image, offset, driver)
         inject_config(raw_image, offset, driver_config)
 
         if apps:
-            inject_autoexec_path(raw_image, offset, apps_dir, legacy_app_dirs)
+            inject_autoexec_path(raw_image, offset, apps_dir)
             inject_apps(raw_image, offset, apps, apps_dir)
 
         print(f"Writing qcow2 image: {output_image}", flush=True)
